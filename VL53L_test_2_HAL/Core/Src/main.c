@@ -44,14 +44,18 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-statInfo_t_VL53L0X distanceStr;
-uint16_t distance;
+statInfo_t_VL53L0X distanceStr1;
+statInfo_t_VL53L0X distanceStr2;
+uint16_t distance1;
+uint16_t distance2;
 uint32_t timer;
 uint32_t last_timer = 0;
 uint32_t diff_time;
 uint8_t error;
 VL53L0X dev1;
-extern uint8_t g_i2cAddr;
+VL53L0X dev2;
+
+uint8_t counter = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,36 +102,75 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
-  	HAL_GPIO_WritePin(XSHUT_GPIO_Port, XSHUT_Pin, GPIO_PIN_RESET);
-  	HAL_Delay(10);
-  	HAL_GPIO_WritePin(XSHUT_GPIO_Port, XSHUT_Pin, GPIO_PIN_SET);
-  	HAL_Delay(100);
-  	dev1.g_i2cAddr = 0b01010010;
-  	dev1.g_ioTimeout = 0;
-  	dev1.g_isTimeout = 0;
-	uint8_t new_addr = 0x54;
-	setAddress_VL53L0X(&dev1, new_addr);
-	initVL53L0X(&dev1, 1, &hi2c1);
+	dev1.g_i2cAddr = 0b01010010;
+	dev1.g_ioTimeout = 0;
+	dev1.g_isTimeout = 0;
+	dev2.g_i2cAddr = 0b01010010;
+	dev2.g_ioTimeout = 0;
+	dev2.g_isTimeout = 0;
+	uint8_t new_addr1 = 0x54;
+	uint8_t new_addr2 = 0x56;
 
-	// Configure the sensor for high accuracy and speed in 20 cm.
+//  	HAL_GPIO_WritePin(XSHUT1_GPIO_Port, XSHUT1_Pin, GPIO_PIN_RESET);
+//  	HAL_Delay(10);
+//  	HAL_GPIO_WritePin(XSHUT1_GPIO_Port, XSHUT1_Pin, GPIO_PIN_SET);
+//  	HAL_Delay(100);
+
+	HAL_GPIO_WritePin(XSHUT1_GPIO_Port, XSHUT1_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(XSHUT2_GPIO_Port, XSHUT2_Pin, GPIO_PIN_RESET);
+
+	HAL_GPIO_WritePin(XSHUT1_GPIO_Port, XSHUT1_Pin, GPIO_PIN_SET);
+	HAL_Delay(100);
+	setAddress_VL53L0X(&dev1, new_addr1);
+	HAL_Delay(100);
+
+	HAL_GPIO_WritePin(XSHUT2_GPIO_Port, XSHUT2_Pin, GPIO_PIN_SET);
+	HAL_Delay(100);
+	setAddress_VL53L0X(&dev2, new_addr2);
+	HAL_Delay(100);
+
+	initVL53L0X(&dev1, 1, &hi2c1);
 	setSignalRateLimit(&dev1, 200);
-	setVcselPulsePeriod(&dev1, VcselPeriodPreRange, 10);
+	setVcselPulsePeriod(&dev1, VcselPeriodPreRange, 12);
 	setVcselPulsePeriod(&dev1, VcselPeriodFinalRange, 14);
-	setMeasurementTimingBudget(&dev1, 150 * 1000UL);
+//	setMeasurementTimingBudget(&dev1, 300 * 1000UL);
+	setMeasurementTimingBudget(&dev1, (uint32_t)166000);
+
+	HAL_Delay(100);
+
+	initVL53L0X(&dev2, 1, &hi2c1);
+	setSignalRateLimit(&dev2, 200);
+	setVcselPulsePeriod(&dev2, VcselPeriodPreRange, 12);
+	setVcselPulsePeriod(&dev2, VcselPeriodFinalRange, 14);
+//	setMeasurementTimingBudget(&dev2, 300 * 1000UL);
+	setMeasurementTimingBudget(&dev2, (uint32_t)166000);
 //
-//	startContinuous(&dev1,0);
+	HAL_Delay(100);
+	startContinuous(&dev1,0);
+	HAL_Delay(100);
+	startContinuous(&dev2,0);
+	HAL_Delay(100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  distance = readRangeSingleMillimeters(&dev1, &distanceStr);
-//	  error = checkRangeContinuousMillimeters(&dev1, &distanceStr, &distance);
-//	  HAL_Delay(10);
+	  if (counter){
+		  distance1 = readRangeContinuousMillimeters(&dev1, &distanceStr1);
+	  } else {
+		  distance2 = readRangeContinuousMillimeters(&dev2, &distanceStr2);
+	  }
+	  if (counter++ == 2) counter = 0;
+
 	  timer = HAL_GetTick();
 	  diff_time = timer - last_timer;
 	  last_timer = timer;
+	  HAL_Delay(10);
+
+  //	  distance = readRangeSingleMillimeters(&dev1, &distanceStr);
+  //	  error = checkRangeContinuousMillimeters(&dev1, &distanceStr, &distance);
+  //	  HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -225,14 +268,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(XSHUT_GPIO_Port, XSHUT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, XSHUT2_Pin|XSHUT1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : XSHUT_Pin */
-  GPIO_InitStruct.Pin = XSHUT_Pin;
+  /*Configure GPIO pin : XSHUT2_Pin */
+  GPIO_InitStruct.Pin = XSHUT2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(XSHUT2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : XSHUT1_Pin */
+  GPIO_InitStruct.Pin = XSHUT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(XSHUT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(XSHUT1_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
